@@ -12,7 +12,9 @@ HODL Buddy is a DApp for TON that allows you to lock your funds for a certain pe
 
 ## Usage
 
-### Setup
+**Web UI coming soon...**
+
+### CLI Setup
 
 Start by cloning the repository and installing the dependencies:
 
