@@ -30,7 +30,7 @@ Choose `deposit` from the menu and enter the following info:
 
 -   How long to HODL? - Enter the number of seconds you want to lock your funds for. E.g.: 300 for 5 minutes.
 -   What is your address? - Enter your TON address.
-    -   **Important**: make sure to check your address with an [explorer](https://tonscan.org/) to see the current format.
+    -   **Important**: Copy the address from the CLI. E.g.: `Connected to wallet at address: EQ...`.
     -   At the time of writing, the address format is `UQ...`.
 -   Deposit amount - Enter the amount in TON coins. E.g.: `1.5`.
 
