@@ -1,0 +1,97 @@
+#include "imports/stdlib.fc";
+
+const const::min_tons_for_storage = 1000000; ;; 0.01 TON
+
+;; Load data from the LOCAL storage
+(int, slice, slice) load_data() inline {
+    var ds = get_data().begin_parse();
+    return (
+        ds~load_uint(64), ;; min redemption date
+        ds~load_msg_addr(), ;; most recent sender
+        ds~load_msg_addr() ;; owner_address
+    );
+}
+
+;; Save data to the LOCAL storage
+() save_data(int redeemable_at, slice recent_address, slice owner_address) impure inline {
+    set_data(begin_cell()
+        .store_uint(redeemable_at, 64) ;; store the redemption date back
+        .store_slice(recent_address) ;; store the most recent sender
+        .store_slice(owner_address) ;; store the owner address
+        .end_cell());
+}
+
+() recv_internal(int msg_value {- Amount of Ton -}, cell in_msg {- Message body -}, slice in_msg_body {- Readable part of the cell -}) impure {
+    slice cs = in_msg.begin_parse();
+    int flags = cs~load_uint(4); ;; first 4 bytes are flags
+    slice sender_address = cs~load_msg_addr(); ;; get the address
+
+    int op = in_msg_body~load_uint(32); ;; OP Code
+
+    var (redeemable_at, recent_address, owner_address) = load_data();
+
+    ;; deposit
+    if (op == 1) {
+        save_data(redeemable_at, sender_address, owner_address);
+        return();
+    }
+
+    ;; withdraw
+    if (op == 2) {
+        ;; Check if the sender is the owner
+        throw_unless(103, equal_slice_bits(sender_address, owner_address));
+
+        ;; Check if the redemption date is reached
+        int current_time = now();
+        throw_unless(104, current_time > redeemable_at);
+
+        int withdraw_amount = in_msg_body~load_coins();
+        var [balance, _] = get_balance();
+        
+        ;; Check if the contract has enough balance
+        ;; & return the minimum of the two values
+        throw_unless(105, balance >= withdraw_amount); 
+        int return_value = min(withdraw_amount, balance - const::min_tons_for_storage);
+
+        int withdraw_all = in_msg_body~load_uint(1);
+
+        ;; Configure the sender to pay fees separately (mode 1)
+        ;; 0 + 1 withdraw the amount and fees separately
+        ;; 128 + 32 withdraw all and destroy the contract
+        int msg_mode = 0;
+
+        if (withdraw_all == 0) {
+            msg_mode = 0 + 1;
+        }
+
+        if (withdraw_all == 1) {
+            msg_mode = 128 + 32;
+        }
+        
+        var msg = begin_cell()
+            .store_uint(0x18, 6) ;; default values
+            .store_slice(sender_address)
+            .store_coins(return_value)
+            .store_uint(0, 1 + 4 + 4 + 64 + 32 + 1 + 1);
+
+        send_raw_message(msg.end_cell(), msg_mode);
+
+        return();
+    }
+
+    throw(777); ;; unknown operation code
+}
+
+(int, slice, slice) get_contract_storage_data() method_id {
+    var (redeemable_at, recent_address, owner_address) = load_data();
+    return (
+        redeemable_at, 
+        recent_address, 
+        owner_address
+    ); 
+}
+
+int balance() method_id {
+    var [balance, _] = get_balance();
+    return balance;
+}
